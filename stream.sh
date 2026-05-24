@@ -8,6 +8,9 @@ if [ -z "$STREAM_KEY" ]; then
   exit 1
 fi
 
+# Эта команда найдет все mp3 в папке audio и запишет их в правильном формате
+find "/app/audio" -name "*.mp3" -printf "file '%p'\n" > playlist.txt
+
 # Запускаем виртуальный дисплей
 Xvfb :99 -screen 0 1080x1920x24 -ac &
 sleep 1
@@ -20,19 +23,23 @@ sleep 2
 echo "Начинаем прямую трансляцию на YouTube..."
 
 # Запускаем FFmpeg с генерацией пустой аудиодорожки и стримингом по RTMP
-ffmpeg -f x11grab \
-       -video_size 1080x1920 \
-       -framerate 30 \
-       -i :99.0 \
-       -f lavfi \
-       -i anullsrc=channel_layout=stereo:sample_rate=44100 \
-       -c:v libx264 \
-       -preset veryfast \
-       -b:v 2500k \
-       -maxrate 2500k \
-       -bufsize 5000k \
-       -pix_fmt yuv420p \
-       -g 60 \
-       -c:a aac \
-       -b:a 128k \
-       -f flv "rtmp://a.rtmp.youtube.com/live2/$STREAM_KEY"
+ffmpeg \
+  -f x11grab \
+  -video_size 1080x1920 \
+  -framerate 30 \
+  -i :99.0 \
+  -stream_loop -1 \
+  -f concat \
+  -safe 0 \
+  -i playlist.txt \
+  -c:v libx264 \
+  -preset veryfast \
+  -b:v 2500k \
+  -maxrate 2500k \
+  -bufsize 5000k \
+  -pix_fmt yuv420p \
+  -g 60 \
+  -c:a aac \
+  -b:a 192k \
+  -af "loudnorm" \
+  -f flv "rtmp://a.rtmp.youtube.com/live2/$STREAM_KEY"

@@ -21,5 +21,7 @@ RUN npm install puppeteer youtube-chat
 COPY index.html browser.js stream.sh ./
 RUN chmod +x stream.sh
 
+COPY ./audio/ /app/audio/
+
 # Запускаем наш баш-скрипт при старте контейнера
 CMD ["./stream.sh"]
