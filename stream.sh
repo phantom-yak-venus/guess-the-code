@@ -2,12 +2,6 @@
 killall Xvfb node ffmpeg 2>/dev/null
 rm -f /tmp/audio_pipe
 
-# Чтение и установка конфигурации игры (с дефолтными значениями)
-export APP_VERSION=${APP_VERSION:-"SYS_HACK v1.3.0"}
-export SHOW_VERSION=${SHOW_VERSION:-"true"}
-export CHEATS_ENABLED=${CHEATS_ENABLED:-"true"}
-export DIFFICULTY=${DIFFICULTY:-"EASY"}  # Доступно: EASY, MEDIUM, HARD
-
 # Проверяем, передан ли ключ трансляции
 if [ -z "$STREAM_KEY" ]; then
   echo "Ошибка: Переменная STREAM_KEY не задана!"
@@ -57,7 +51,8 @@ ffmpeg \
   -thread_queue_size 1024 \
   -i /tmp/audio_pipe \
   -c:v libx264 \
-  -preset veryfast \
+  -preset ultrafast \
+  -tune zerolatency \
   -b:v 2500k \
   -maxrate 2500k \
   -bufsize 5000k \
