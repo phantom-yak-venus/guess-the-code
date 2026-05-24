@@ -197,6 +197,11 @@
     }
 
     function startRound() {
+      // Сигнализируем Node.js о старте раунда (для очистки фильтров)
+      if (window.onNewRoundStarted) {
+        window.onNewRoundStarted();
+      }
+
       state = 'HACKING';
       winnerData = null;
       hackQueue.length = 0;
