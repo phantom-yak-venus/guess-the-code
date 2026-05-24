@@ -23,46 +23,75 @@ const { LiveChat } = require('youtube-chat');
   const page = await browser.newPage();
   const fileUrl = `file://${path.join(__dirname, 'index.html')}`;
   await page.goto(fileUrl);
-  console.log('Браузер запущен.');
+  console.log('Браузер запущен. Отрисовка экрана загрузки...');
 
-  // --- Интеграция YouTube Чата ---
   const channelId = process.env.CHANNEL_ID;
   
-  if (channelId) {
-    console.log(`Ожидаем 15 секунд перед подключением к чату канала ${channelId}...`);
-    
-    setTimeout(async () => {
-      try {
-        const liveChat = new LiveChat({ channelId });
-        
-        liveChat.on('start', (liveId) => {
-          console.log(`✅ Чат успешно подключен! Live ID: ${liveId}`);
-          // Выводим тестовое сообщение
-          page.evaluate(() => window.showChatMessage('Система', 'Слушатель чата запущен!')).catch(()=>{});
-        });
-
-        liveChat.on('chat', async (chatItem) => {
-          const author = chatItem.author.name;
-          // Достаем URL аватарки (если её нет, ставим заглушку)
-          const avatarUrl = chatItem.author.thumbnail?.url || 'https://via.placeholder.com/250/000000/00FF00?text=?';
-          const text = chatItem.message.map(m => m.text || '').join(' ');
-          
-          console.log(`[ЧАТ] ${author}: ${text}`);
-
-          // Передаем автора, текст и ссылку на аватарку в нашу стейт-машину
-          await page.evaluate((a, t, img) => {
-            if (window.handleChat) window.handleChat(a, t, img);
-          }, author, text, avatarUrl).catch(() => {});
-        });
-
-        liveChat.on('error', (err) => console.log('❌ Ошибка чата:', err.message));
-        
-        await liveChat.start();
-      } catch (err) {
-        console.log('❌ Не удалось подключиться к чату. Возможно, стрим еще не начался.');
-      }
-    }, 15000); // Задержка 15 секунд
-  } else {
-    console.log('⚠️ CHANNEL_ID не указан, чат выключен.');
+  if (!channelId) {
+    console.log('⚠️ CHANNEL_ID не указан. Запускаем игру в оффлайн-режиме.');
+    await page.evaluate(() => window.initGame());
+    return;
   }
+
+  let chatConnected = false;
+  let isRetrying = false; // Блокиратор для предотвращения дублирования таймеров
+
+  const connectToChat = async () => {
+    if (chatConnected) return;
+
+    console.log(`⏳ Проверка статуса стрима на канале ${channelId}...`);
+    const liveChat = new LiveChat({ channelId });
+
+    // Единая функция-предохранитель для планирования реконнекта
+    const scheduleRetry = () => {
+      liveChat.stop(); // Уничтожаем текущий инстанс, чтобы не плодить слушателей
+      
+      // Если стрим уже подключен или таймер уже запущен — ничего не делаем
+      if (chatConnected || isRetrying) return;
+      
+      isRetrying = true;
+      console.log('🔄 Повторная попытка через 5 секунд...');
+      setTimeout(() => {
+        isRetrying = false;
+        connectToChat();
+      }, 5000);
+    };
+
+    liveChat.on('start', (liveId) => {
+      chatConnected = true;
+      isRetrying = false;
+      console.log(`✅ Чат успешно подключен! Live ID: ${liveId}`);
+      
+      page.evaluate(() => {
+        if (window.initGame) window.initGame();
+      }).catch(()=>{});
+    });
+
+    liveChat.on('chat', async (chatItem) => {
+      const author = chatItem.author.name;
+      const avatarUrl = chatItem.author.thumbnail?.url || 'https://via.placeholder.com/250/000000/00FF00?text=?';
+      const text = chatItem.message.map(m => m.text || '').join(' ');
+      
+      await page.evaluate((a, t, img) => {
+        if (window.handleChat) window.handleChat(a, t, img);
+      }, author, text, avatarUrl).catch(() => {});
+    });
+
+    liveChat.on('error', (err) => {
+      // Это событие теперь не будет плодить новые таймеры, если catch уже сработал
+      scheduleRetry();
+    });
+
+    try {
+      const ok = await liveChat.start();
+      if (!ok) {
+        scheduleRetry();
+      }
+    } catch (err) {
+      scheduleRetry();
+    }
+  };
+
+  // Запускаем первую попытку
+  connectToChat();
 })();

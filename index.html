@@ -24,7 +24,7 @@
     .avatar { width: 200px; height: 200px; border-radius: 50%; border: 8px solid #0f0; margin-bottom: 20px; object-fit: cover; }
     .timer { font-size: 40px; color: #ffe600; margin-top: 30px; }
 
-    /* Экран 1-2: Взлом (всё компактнее) */
+    /* Экран 1-2: Взлом */
     .input-box { border: 8px solid #0f0; font-size: 130px; padding: 30px 60px; letter-spacing: 30px; text-shadow: 0 0 20px #0f0; box-shadow: 0 0 40px rgba(0,255,0,0.5); background: rgba(0,20,0,0.8); margin: 40px 0; min-width: 500px; transition: color 0.1s, border-color 0.1s, text-shadow 0.1s, box-shadow 0.1s; }
     .player-name { font-size: 50px; margin-bottom: 40px; color: #fff; transition: color 0.1s; }
     
@@ -45,7 +45,7 @@
         color: #ff003c;
     }
 
-    /* Экран 3-4: Победитель и Сообщение (соразмерное уменьшение) */
+    /* Экран 3-4: Победитель и Сообщение */
     .winner-name { font-size: 70px; color: #fff; margin-bottom: 15px; }
     .winner-code { font-size: 120px; color: #0f0; text-shadow: 0 0 30px #0f0; margin: 30px 0; }
     .msg-box { font-size: 55px; color: #fff; background: rgba(255,255,255,0.1); padding: 50px; border-radius: 25px; width: 80%; word-wrap: break-word; border: 5px solid #0f0; }
@@ -56,13 +56,36 @@
     .lb-row img { width: 80px; height: 80px; border-radius: 50%; margin: 0 25px; border: 3px solid #0f0; }
     .lb-name { flex-grow: 1; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .lb-score { color: #ffe600; font-weight: bold; }
+
+    /* Анимация точек загрузки */
+    .loading-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    .loading-dots {
+      position: absolute;
+      left: 100%;
+      bottom: 0;
+      overflow: hidden;
+      animation: dotsAnim 1.5s steps(4, end) infinite;
+    }
+    @keyframes dotsAnim {
+      0% { width: 0px; }
+      100% { width: 1.2em; }
+    }
   </style>
 </head>
 <body>
   <canvas id="matrix"></canvas>
 
   <div id="app">
-    <div id="screen-hack" class="screen active">
+    <div id="screen-loading" class="screen active">
+      <h1 class="yellow loading-wrapper">УСТАНОВКА СВЯЗИ<span class="loading-dots">...</span></h1>
+      <div class="timer" style="margin-top: 100px;">ПОИСК СИГНАЛА ЧАТА</div>
+      <div class="timer" style="font-size: 30px;">(Обычно занимает 10-15 секунд)</div>
+    </div>
+
+    <div id="screen-hack" class="screen">
       <h1 class="red">СИСТЕМА ЗАШИФРОВАНА</h1>
       <h1 class="yellow">ПИШИТЕ В ЧАТ 4 ЦИФРЫ!</h1>
       <div class="input-box" id="hack-display">****</div>
@@ -97,9 +120,7 @@
     // ==========================================
     // --- КОНФИГУРАЦИЯ ТЕСТИРОВАНИЯ (ПАСХАЛКА) ---
     // ==========================================
-    // Установите в true, чтобы скрыть правильный ответ в анимации Матрицы.
-    // Цифры будут падать последовательностью: код-код-код...
-    const cheatsEnabled = true; 
+    const cheatsEnabled = false; 
 
     // --- АНИМАЦИЯ МАТРИЦЫ ---
     const canvas = document.getElementById('matrix');
@@ -116,21 +137,13 @@
       
       for (let i = 0; i < drops.length; i++) {
         let text;
-        
-        // ЛОГИКА ПАСХАЛКИ ДЛЯ ТЕСТИРОВАНИЯ
         if (cheatsEnabled && state === 'HACKING' && currentCode.length === 4) {
-          // Определяем, какую цифру кода рисовать, основываясь на текущей строке (drops[i])
-          // (drops[i] - 1) т.к. drops начинается с 1. Инкремент в конце цикла.
           const codeIndex = (drops[i] - 1) % currentCode.length;
           text = currentCode[codeIndex];
         } else {
-          // Обычный режим: случайная цифра
           text = letters[Math.floor(Math.random() * letters.length)];
         }
-
         ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-        
-        // Сброс капли, если ушла за экран или случайный сброс
         if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
         drops[i]++;
       }
@@ -138,12 +151,10 @@
 
     // --- ЛОГИКА ИГРЫ ---
     let state = 'HACKING';
-    let currentCode = ''; // Будет сгенерирован в startRound
+    let currentCode = '';
     let winnerData = null;
     let timerInt = null;
     const players = {}; 
-    
-    // Переменная для хранения последних попыток (Анти-спам)
     let lastPlayerAttempts = {}; 
     
     const hackQueue = [];
@@ -174,7 +185,7 @@
       state = 'HACKING';
       winnerData = null;
       hackQueue.length = 0;
-      lastPlayerAttempts = {}; // Очищаем историю попыток в новом раунде
+      lastPlayerAttempts = {}; 
       
       document.getElementById('screen-hack').classList.remove('wrong-input');
 
@@ -211,11 +222,11 @@
       switchScreen('screen-winner');
 
       let timeLeft = 20;
-      document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
+      document.getElementById('win-timer').innerText = `ОЖИВАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
       
       timerInt = setInterval(() => {
         timeLeft--;
-        document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
+        document.getElementById('win-timer').innerText = `ОЖИВАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
         if (timeLeft <= 0) {
           clearInterval(timerInt);
           if (winnerData.message) showMessageScreen();
@@ -273,12 +284,10 @@
       if (state === 'HACKING' && match) {
         const code = match[0];
         
-        // --- АНТИ-СПАМ ФИЛЬТРЫ ---
         if (lastPlayerAttempts[author] === code) return; 
         const userPendingAttempts = hackQueue.filter(item => item.author === author).length;
         if (userPendingAttempts >= 2) return; 
         lastPlayerAttempts[author] = code;
-        // -------------------------
 
         hackQueue.push({ author, code });
 
@@ -293,7 +302,14 @@
       }
     };
 
-    startRound();
+    // Функция инициализации игры (вызывается из browser.js после коннекта чата)
+    window.initGame = () => {
+      document.getElementById('matrix').style.opacity = 0.3; 
+      startRound();
+    };
+
+    // При загрузке делаем матрицу поярче для экрана ожидания
+    document.getElementById('matrix').style.opacity = 0.8; 
   </script>
 </body>
 </html>
