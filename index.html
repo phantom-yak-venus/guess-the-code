@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>System Hack Stream Game</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    
+    body { margin: 0; background: #000; color: #0f0; font-family: 'Share Tech Mono', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; position: relative; }
+    canvas { position: absolute; top: 0; left: 0; z-index: 1; opacity: 0.3; }
+    
+    #app { position: relative; z-index: 10; width: 1000px; height: 1920px; display: flex; flex-direction: column; text-align: center; }
+    
+    /* Смещение контента вверх: flex-start вместо center + padding-top */
+    .screen { display: none; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 250px; height: 100%; animation: fadeIn 0.5s ease-in; box-sizing: border-box; }
+    .active { display: flex; }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+    /* Общие стили (шрифты уменьшены) */
+    h1 { font-size: 60px; margin: 0 0 15px 0; text-shadow: 0 0 15px currentColor; }
+    .red { color: #ff003c; }
+    .yellow { color: #ffe600; }
+    .avatar { width: 200px; height: 200px; border-radius: 50%; border: 8px solid #0f0; margin-bottom: 20px; object-fit: cover; }
+    .timer { font-size: 40px; color: #ffe600; margin-top: 30px; }
+
+    /* Экран 1-2: Взлом (всё компактнее) */
+    .input-box { border: 8px solid #0f0; font-size: 130px; padding: 30px 60px; letter-spacing: 30px; text-shadow: 0 0 20px #0f0; box-shadow: 0 0 40px rgba(0,255,0,0.5); background: rgba(0,20,0,0.8); margin: 40px 0; min-width: 500px; transition: color 0.1s, border-color 0.1s, text-shadow 0.1s, box-shadow 0.1s; }
+    .player-name { font-size: 50px; margin-bottom: 40px; color: #fff; transition: color 0.1s; }
+    
+    /* Подсказки остаются 40px, но отступы чуть меньше */
+    .hints { text-align: left; font-size: 40px; background: rgba(0, 255, 0, 0.1); padding: 40px; border-left: 10px solid #0f0; width: 80%; }
+    .hints div { margin-bottom: 15px; }
+    .hints span { color: #fff; }
+
+    /* Класс для неверного ввода */
+    .wrong-input .input-box {
+        color: #ff003c;
+        border-color: #ff003c;
+        text-shadow: 0 0 20px #ff003c;
+        box-shadow: 0 0 40px rgba(255, 0, 60, 0.5);
+        background: rgba(20,0,0,0.8);
+    }
+    .wrong-input .player-name {
+        color: #ff003c;
+    }
+
+    /* Экран 3-4: Победитель и Сообщение (соразмерное уменьшение) */
+    .winner-name { font-size: 70px; color: #fff; margin-bottom: 15px; }
+    .winner-code { font-size: 120px; color: #0f0; text-shadow: 0 0 30px #0f0; margin: 30px 0; }
+    .msg-box { font-size: 55px; color: #fff; background: rgba(255,255,255,0.1); padding: 50px; border-radius: 25px; width: 80%; word-wrap: break-word; border: 5px solid #0f0; }
+
+    /* Экран 5: Лидерборд */
+    .leaderboard { width: 90%; text-align: left; font-size: 50px; }
+    .lb-row { display: flex; align-items: center; background: rgba(0,255,0,0.1); margin-bottom: 15px; padding: 15px 20px; border-radius: 15px; }
+    .lb-row img { width: 80px; height: 80px; border-radius: 50%; margin: 0 25px; border: 3px solid #0f0; }
+    .lb-name { flex-grow: 1; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-score { color: #ffe600; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <canvas id="matrix"></canvas>
+
+  <div id="app">
+    <div id="screen-hack" class="screen active">
+      <h1 class="red">СИСТЕМА ЗАШИФРОВАНА</h1>
+      <h1 class="yellow">ПИШИТЕ В ЧАТ 4 ЦИФРЫ!</h1>
+      <div class="input-box" id="hack-display">****</div>
+      <div class="player-name" id="hack-author">ожидание...</div>
+      <div class="hints" id="hack-hints"></div>
+    </div>
+
+    <div id="screen-winner" class="screen">
+      <h1 class="red">СИСТЕМА ВЗЛОМАНА</h1>
+      <img id="win-avatar" class="avatar" src="" alt="avatar">
+      <div class="winner-name" id="win-author">@player</div>
+      <div>Правильная последовательность:</div>
+      <div class="winner-code" id="win-code">0000</div>
+      <div class="timer" id="win-timer">ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: 20 СЕК.</div>
+    </div>
+
+    <div id="screen-message" class="screen">
+      <img id="msg-avatar" class="avatar" src="" alt="avatar">
+      <div class="winner-name" id="msg-author">@player</div>
+      <div class="msg-box" id="msg-text">Всем привет!</div>
+      <div class="timer" id="msg-timer">ТРАНСЛЯЦИЯ: 15 СЕК.</div>
+    </div>
+
+    <div id="screen-lb" class="screen">
+      <h1 class="yellow">ЛУЧШИЕ ИГРОКИ СТРИМА</h1>
+      <div class="leaderboard" id="lb-container"></div>
+      <div class="timer" id="lb-timer">СЛЕДУЮЩИЙ РАУНД ЧЕРЕЗ: 10 СЕК.</div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // --- КОНФИГУРАЦИЯ ТЕСТИРОВАНИЯ (ПАСХАЛКА) ---
+    // ==========================================
+    // Установите в true, чтобы скрыть правильный ответ в анимации Матрицы.
+    // Цифры будут падать последовательностью: код-код-код...
+    const cheatsEnabled = true; 
+
+    // --- АНИМАЦИЯ МАТРИЦЫ ---
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    const letters = '0123456789'.split('');
+    const fontSize = 30; const columns = canvas.width / fontSize;
+    const drops = Array.from({length: columns}).fill(1);
+    
+    setInterval(() => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0F0'; ctx.font = fontSize + 'px monospace';
+      
+      for (let i = 0; i < drops.length; i++) {
+        let text;
+        
+        // ЛОГИКА ПАСХАЛКИ ДЛЯ ТЕСТИРОВАНИЯ
+        if (cheatsEnabled && state === 'HACKING' && currentCode.length === 4) {
+          // Определяем, какую цифру кода рисовать, основываясь на текущей строке (drops[i])
+          // (drops[i] - 1) т.к. drops начинается с 1. Инкремент в конце цикла.
+          const codeIndex = (drops[i] - 1) % currentCode.length;
+          text = currentCode[codeIndex];
+        } else {
+          // Обычный режим: случайная цифра
+          text = letters[Math.floor(Math.random() * letters.length)];
+        }
+
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        
+        // Сброс капли, если ушла за экран или случайный сброс
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+    }, 50);
+
+    // --- ЛОГИКА ИГРЫ ---
+    let state = 'HACKING';
+    let currentCode = ''; // Будет сгенерирован в startRound
+    let winnerData = null;
+    let timerInt = null;
+    const players = {}; 
+    
+    // Переменная для хранения последних попыток (Анти-спам)
+    let lastPlayerAttempts = {}; 
+    
+    const hackQueue = [];
+    setInterval(() => {
+      if (state === 'HACKING' && hackQueue.length > 0) {
+        const { author, code } = hackQueue.shift();
+        const displayEl = document.getElementById('hack-display');
+        const authorEl = document.getElementById('hack-author');
+        const hackScreen = document.getElementById('screen-hack');
+
+        displayEl.innerText = code;
+        authorEl.innerText = `${author}`; 
+
+        if (code === currentCode) {
+            hackScreen.classList.remove('wrong-input');
+        } else {
+            hackScreen.classList.add('wrong-input');
+        }
+      }
+    }, 400);
+
+    function switchScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function startRound() {
+      state = 'HACKING';
+      winnerData = null;
+      hackQueue.length = 0;
+      lastPlayerAttempts = {}; // Очищаем историю попыток в новом раунде
+      
+      document.getElementById('screen-hack').classList.remove('wrong-input');
+
+      currentCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+      document.getElementById('hack-display').innerText = '****';
+      document.getElementById('hack-author').innerText = 'ожидание...';
+      
+      const digits = currentCode.split('').map(Number);
+      const sum = digits.reduce((a, b) => a + b, 0);
+      const evens = digits.filter(n => n % 2 === 0).length;
+      const missingDigit = [0,1,2,3,4,5,6,7,8,9].find(n => !digits.includes(n));
+      
+      let hintsHTML = `<div>> <span>Сумма всех цифр:</span> ${sum}</div>`;
+      hintsHTML += `<div>> <span>Количество четных цифр:</span> ${evens}</div>`;
+      if (missingDigit !== undefined) hintsHTML += `<div>> <span>В коде точно нет цифры:</span> ${missingDigit}</div>`;
+      if (digits[0] > digits[3]) hintsHTML += `<div>> <span>Первая цифра больше последней</span></div>`;
+      else if (digits[0] < digits[3]) hintsHTML += `<div>> <span>Первая цифра меньше последней</span></div>`;
+      else hintsHTML += `<div>> <span>Первая и последняя цифры равны</span></div>`;
+      
+      document.getElementById('hack-hints').innerHTML = hintsHTML;
+      switchScreen('screen-hack');
+    }
+
+    function triggerWin(author, avatarUrl) {
+      state = 'WAITING_MSG';
+      winnerData = { author, avatar: avatarUrl, message: null };
+      
+      if (!players[author]) players[author] = { score: 0, avatar: avatarUrl };
+      players[author].score += 50;
+
+      document.getElementById('win-author').innerText = `@${author}`; 
+      document.getElementById('win-avatar').src = avatarUrl;
+      document.getElementById('win-code').innerText = currentCode;
+      switchScreen('screen-winner');
+
+      let timeLeft = 20;
+      document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
+      
+      timerInt = setInterval(() => {
+        timeLeft--;
+        document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
+        if (timeLeft <= 0) {
+          clearInterval(timerInt);
+          if (winnerData.message) showMessageScreen();
+          else showLeaderboard(); 
+        }
+      }, 1000);
+    }
+
+    function showMessageScreen() {
+      state = 'SHOW_MSG';
+      document.getElementById('msg-author').innerText = `@${winnerData.author}`;
+      document.getElementById('msg-avatar').src = winnerData.avatar;
+      document.getElementById('msg-text').innerText = winnerData.message;
+      switchScreen('screen-message');
+
+      let timeLeft = 15;
+      document.getElementById('msg-timer').innerText = `ТРАНСЛЯЦИЯ: ${timeLeft} СЕК.`;
+      timerInt = setInterval(() => {
+        timeLeft--;
+        document.getElementById('msg-timer').innerText = `ТРАНСЛЯЦИЯ: ${timeLeft} СЕК.`;
+        if (timeLeft <= 0) { clearInterval(timerInt); showLeaderboard(); }
+      }, 1000);
+    }
+
+    function showLeaderboard() {
+      state = 'LEADERBOARD';
+      const sorted = Object.entries(players).sort((a, b) => b[1].score - a[1].score).slice(0, 10);
+      
+      let lbHTML = '';
+      sorted.forEach(([name, data], idx) => {
+        const num = String(idx + 1).padStart(2, '0');
+        lbHTML += `
+          <div class="lb-row">
+            <span class="yellow">${num}</span>
+            <img src="${data.avatar}" alt="ava">
+            <span class="lb-name">@${name}</span>
+            <span class="lb-score">${data.score} PTS</span>
+          </div>`;
+      });
+      document.getElementById('lb-container').innerHTML = lbHTML || '<div style="color: #fff; text-align: center; margin-top: 50px;">Пока нет победителей</div>';
+      switchScreen('screen-lb');
+
+      let timeLeft = 10;
+      document.getElementById('lb-timer').innerText = `СЛЕДУЮЩИЙ РАУНД ЧЕРЕЗ: ${timeLeft} СЕК.`;
+      timerInt = setInterval(() => {
+        timeLeft--;
+        document.getElementById('lb-timer').innerText = `СЛЕДУЮЩИЙ РАУНД ЧЕРЕЗ: ${timeLeft} СЕК.`;
+        if (timeLeft <= 0) { clearInterval(timerInt); startRound(); }
+      }, 1000);
+    }
+
+    window.handleChat = (author, text, avatarUrl) => {
+      const match = text.match(/\b\d{4}\b/);
+      
+      if (state === 'HACKING' && match) {
+        const code = match[0];
+        
+        // --- АНТИ-СПАМ ФИЛЬТРЫ ---
+        if (lastPlayerAttempts[author] === code) return; 
+        const userPendingAttempts = hackQueue.filter(item => item.author === author).length;
+        if (userPendingAttempts >= 2) return; 
+        lastPlayerAttempts[author] = code;
+        // -------------------------
+
+        hackQueue.push({ author, code });
+
+        if (code === currentCode) {
+          triggerWin(author, avatarUrl);
+        }
+      } 
+      else if (state === 'WAITING_MSG' && author === winnerData.author) {
+        winnerData.message = text;
+        clearInterval(timerInt); 
+        showMessageScreen(); 
+      }
+    };
+
+    startRound();
+  </script>
+</body>
+</html>
