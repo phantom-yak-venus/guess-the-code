@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer');
 const path = require('path');
 const { LiveChat } = require('youtube-chat');
+const dns = require('dns'); // Используем встроенный модуль DNS
 
 (async () => {
   const browser = await puppeteer.launch({
@@ -33,29 +34,60 @@ const { LiveChat } = require('youtube-chat');
     return;
   }
 
+  let liveChat = null;
   let chatConnected = false;
-  let isRetrying = false; // Блокиратор для предотвращения дублирования таймеров
+  let isRetrying = false; 
+
+  const scheduleRetry = (reason = 'Неизвестная ошибка') => {
+    if (isRetrying) return;
+    
+    isRetrying = true;
+    chatConnected = false;
+    
+    console.log(`\n🔄 РАЗРЫВ СОЕДИНЕНИЯ (${reason}). Переподключение через 5 секунд...`);
+    
+    if (liveChat) {
+      liveChat.stop();
+      liveChat = null; 
+    }
+    
+    page.evaluate(() => {
+      if (window.showReconnect) window.showReconnect();
+    }).catch(()=>{});
+
+    setTimeout(() => {
+      isRetrying = false;
+      connectToChat();
+    }, 5000);
+  };
+
+  process.on('unhandledRejection', (err) => {
+    console.error('🚨 Скрытая ошибка внутри youtube-chat:', err.message);
+    scheduleRetry('Скрытый сбой промиса');
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('🚨 Критическая системная ошибка:', err.message);
+    scheduleRetry('Критическая ошибка Node.js');
+  });
+
+  // Легкий DNS-пинг каждые 10 секунд
+  setInterval(() => {
+    if (!chatConnected || isRetrying) return;
+
+    dns.resolve('youtube.com', (err) => {
+      if (err) {
+        console.log('🐕 Сторожевой пес: Обрыв сети (DNS не отвечает)!');
+        scheduleRetry('Потеряно соединение с интернетом');
+      }
+    });
+  }, 10000);
 
   const connectToChat = async () => {
     if (chatConnected) return;
 
     console.log(`⏳ Проверка статуса стрима на канале ${channelId}...`);
-    const liveChat = new LiveChat({ channelId });
-
-    // Единая функция-предохранитель для планирования реконнекта
-    const scheduleRetry = () => {
-      liveChat.stop(); // Уничтожаем текущий инстанс, чтобы не плодить слушателей
-      
-      // Если стрим уже подключен или таймер уже запущен — ничего не делаем
-      if (chatConnected || isRetrying) return;
-      
-      isRetrying = true;
-      console.log('🔄 Повторная попытка через 5 секунд...');
-      setTimeout(() => {
-        isRetrying = false;
-        connectToChat();
-      }, 5000);
-    };
+    liveChat = new LiveChat({ channelId });
 
     liveChat.on('start', (liveId) => {
       chatConnected = true;
@@ -65,6 +97,14 @@ const { LiveChat } = require('youtube-chat');
       page.evaluate(() => {
         if (window.initGame) window.initGame();
       }).catch(()=>{});
+
+      // --- ДОБАВЬТЕ ЭТОТ БЛОК ДЛЯ ТЕСТА ---
+      setTimeout(() => {
+        console.log('🚨 СИМУЛЯЦИЯ: Принудительный обрыв связи!');
+        // Искусственно вызываем событие 'error' у чата
+        liveChat.emit('error', new Error('Тестовая ошибка сети'));
+      }, 20000); // Ошибка сработает через 20 секунд
+      // ------------------------------------
     });
 
     liveChat.on('chat', async (chatItem) => {
@@ -78,20 +118,18 @@ const { LiveChat } = require('youtube-chat');
     });
 
     liveChat.on('error', (err) => {
-      // Это событие теперь не будет плодить новые таймеры, если catch уже сработал
-      scheduleRetry();
+      console.error('🚨 Ошибка события чата:', err.message);
+      scheduleRetry('Официальная ошибка youtube-chat');
     });
 
     try {
       const ok = await liveChat.start();
-      if (!ok) {
-        scheduleRetry();
-      }
+      if (!ok) scheduleRetry('Стрим пока не найден');
     } catch (err) {
-      scheduleRetry();
+      console.error('🚨 Ошибка при попытке старта:', err.message);
+      scheduleRetry('Ошибка запроса на старт');
     }
   };
 
-  // Запускаем первую попытку
   connectToChat();
 })();
