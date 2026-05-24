@@ -2,6 +2,12 @@
 killall Xvfb node ffmpeg 2>/dev/null
 rm -f /tmp/audio_pipe
 
+# Чтение и установка конфигурации игры (с дефолтными значениями)
+export APP_VERSION=${APP_VERSION:-"SYS_HACK v1.3.0"}
+export SHOW_VERSION=${SHOW_VERSION:-"true"}
+export CHEATS_ENABLED=${CHEATS_ENABLED:-"true"}
+export DIFFICULTY=${DIFFICULTY:-"EASY"}  # Доступно: EASY, MEDIUM, HARD
+
 # Проверяем, передан ли ключ трансляции
 if [ -z "$STREAM_KEY" ]; then
   echo "Ошибка: Переменная STREAM_KEY не задана!"
@@ -10,26 +16,17 @@ if [ -z "$STREAM_KEY" ]; then
 fi
 
 echo "Подготовка аудио потока..."
-# Создаем именованный канал (трубу)
 mkfifo /tmp/audio_pipe
 
-# Фоновый процесс-«диджей»: бесконечно декодирует MP3 в сырой звук
 (
   while true; do
     mp3_found=false
-    
     for file in /app/audio/*.mp3; do
-      # Проверка на то, что файл существует (если папка пуста)
       [ -e "$file" ] || continue
       mp3_found=true
-      
       echo "🎵 Сейчас играет: $(basename "$file")" >&2
-      # Декодируем файл в raw PCM (без заголовков, 16bit, 44100Hz, stereo) и льем в трубу
       ffmpeg -v error -i "$file" -f s16le -ar 44100 -ac 2 -
     done
-    
-    # Защита от падения: если треков нет, генерируем бесконечную тишину, 
-    # чтобы труба не пересохла и стрим не упал
     if [ "$mp3_found" = false ]; then
       echo "⚠️ MP3 файлы не найдены. Генерируем тишину..." >&2
       ffmpeg -v error -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -f s16le -ar 44100 -ac 2 -
@@ -46,10 +43,9 @@ export DISPLAY=:99
 node browser.js &
 sleep 2
 
-echo "Начинаем прямую трансляцию на YouTube..."
+echo "Начинаем прямую трансляцию на YouTube (Сложность: $DIFFICULTY)..."
 
 # Запускаем основной FFmpeg
-# Он читает аудио из /tmp/audio_pipe как из бесконечного микрофона
 ffmpeg \
   -f x11grab \
   -video_size 1080x1920 \

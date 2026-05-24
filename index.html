@@ -46,49 +46,21 @@
     .loading-dots { position: absolute; left: 100%; bottom: 0; overflow: hidden; animation: dotsAnim 1.5s steps(4, end) infinite; }
     @keyframes dotsAnim { 0% { width: 0px; } 100% { width: 1.2em; } }
 
-    /* Плашка потери соединения */
-    #reconnect-banner {
-      display: none;
-      position: absolute;
-      top: 50px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 0, 60, 0.9);
-      color: #fff;
-      font-size: 40px;
-      padding: 15px 40px;
-      border: 4px solid #ff003c;
-      border-radius: 10px;
-      z-index: 100;
-      box-shadow: 0 0 20px #ff003c;
-      animation: pulseError 1s infinite;
-    }
+    #reconnect-banner { display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); background: rgba(255, 0, 60, 0.9); color: #fff; font-size: 40px; padding: 15px 40px; border: 4px solid #ff003c; border-radius: 10px; z-index: 100; box-shadow: 0 0 20px #ff003c; animation: pulseError 1s infinite; }
     @keyframes pulseError { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-    /* Плашка версии приложения */
-    #version-badge {
-      display: none;
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      color: rgba(0, 255, 0, 0.4);
-      font-size: 24px;
-      z-index: 50;
-    }
+    #version-badge { display: none; position: absolute; top: 20px; right: 20px; color: rgba(0, 255, 0, 0.4); font-size: 24px; z-index: 50; text-align: right; }
   </style>
 </head>
 <body>
   <canvas id="matrix"></canvas>
-
   <div id="app">
     <div id="reconnect-banner">ОШИБКА СВЯЗИ С ЧАТОМ. ПЕРЕПОДКЛЮЧЕНИЕ...</div>
-    
     <div id="version-badge"></div>
 
     <div id="screen-loading" class="screen active">
       <h1 class="yellow loading-wrapper">УСТАНОВКА СВЯЗИ<span class="loading-dots">...</span></h1>
       <div class="timer" style="margin-top: 100px;">ПОИСК СИГНАЛА ЧАТА</div>
-      <div class="timer" style="font-size: 30px;">(Обычно занимает 10-15 секунд)</div>
     </div>
 
     <div id="screen-hack" class="screen">
@@ -103,9 +75,8 @@
       <h1 class="red">СИСТЕМА ВЗЛОМАНА</h1>
       <img id="win-avatar" class="avatar" src="" alt="avatar">
       <div class="winner-name" id="win-author">@player</div>
-      <div>Правильная последовательность:</div>
       <div class="winner-code" id="win-code">0000</div>
-      <div class="timer" id="win-timer">ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: 20 СЕК.</div>
+      <div class="timer" id="win-timer">ОЖИДАНИЕ СООБЩЕНИЯ: 20 СЕК.</div>
     </div>
 
     <div id="screen-message" class="screen">
@@ -116,28 +87,27 @@
     </div>
 
     <div id="screen-lb" class="screen">
-      <h1 class="yellow">ЛУЧШИЕ ИГРОКИ СТРИМА</h1>
+      <h1 class="yellow">ЛУЧШИЕ ИГРОКИ</h1>
       <div class="leaderboard" id="lb-container"></div>
       <div class="timer" id="lb-timer">СЛЕДУЮЩИЙ РАУНД ЧЕРЕЗ: 10 СЕК.</div>
     </div>
   </div>
 
   <script>
-    // ==========================================
-    // --- КОНФИГУРАЦИЯ ТЕСТИРОВАНИЯ И СБОРКИ ---
-    // ==========================================
-    const cheatsEnabled = true; // "Пасхалка": вывод кода в Матрице
-    const showVersion = true;    // Флаг отображения версии приложения
-    const appVersion = "SYS_HACK v1.1.0"; // Название текущей версии
-    
-    // Включение отображения бейджа версии
-    if (showVersion) {
+    // --- ПРИЕМ КОНФИГУРАЦИИ ИЗ DOCKER/NODE.JS ---
+    const config = window.GAME_CONFIG || {
+      appVersion: "SYS_HACK v1.0 (Dev)",
+      showVersion: true,
+      cheatsEnabled: false,
+      difficulty: "MEDIUM"
+    };
+
+    if (config.showVersion) {
       const badge = document.getElementById('version-badge');
-      badge.innerText = appVersion;
+      badge.innerHTML = `${config.appVersion}<br>[DIF: ${config.difficulty}]`;
       badge.style.display = 'block';
     }
 
-    // --- АНИМАЦИЯ МАТРИЦЫ ---
     const canvas = document.getElementById('matrix');
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -152,9 +122,8 @@
       
       for (let i = 0; i < drops.length; i++) {
         let text;
-        if (cheatsEnabled && state === 'HACKING' && currentCode.length === 4) {
-          const codeIndex = (drops[i] - 1) % currentCode.length;
-          text = currentCode[codeIndex];
+        if (config.cheatsEnabled && state === 'HACKING' && currentCode.length === 4) {
+          text = currentCode[(drops[i] - 1) % currentCode.length];
         } else {
           text = letters[Math.floor(Math.random() * letters.length)];
         }
@@ -164,30 +133,21 @@
       }
     }, 50);
 
-    // --- ЛОГИКА ИГРЫ ---
     let state = 'HACKING';
     let currentCode = '';
     let winnerData = null;
     let timerInt = null;
     const players = {}; 
     let lastPlayerAttempts = {}; 
-    
     const hackQueue = [];
+
     setInterval(() => {
       if (state === 'HACKING' && hackQueue.length > 0) {
         const { author, code } = hackQueue.shift();
-        const displayEl = document.getElementById('hack-display');
-        const authorEl = document.getElementById('hack-author');
-        const hackScreen = document.getElementById('screen-hack');
-
-        displayEl.innerText = code;
-        authorEl.innerText = `${author}`; 
-
-        if (code === currentCode) {
-            hackScreen.classList.remove('wrong-input');
-        } else {
-            hackScreen.classList.add('wrong-input');
-        }
+        document.getElementById('hack-display').innerText = code;
+        document.getElementById('hack-author').innerText = `${author}`; 
+        if (code === currentCode) document.getElementById('screen-hack').classList.remove('wrong-input');
+        else document.getElementById('screen-hack').classList.add('wrong-input');
       }
     }, 400);
 
@@ -197,60 +157,96 @@
     }
 
     function startRound() {
-      // Сигнализируем Node.js о старте раунда (для очистки фильтров)
-      if (window.onNewRoundStarted) {
-        window.onNewRoundStarted();
-      }
+      if (window.onNewRoundStarted) window.onNewRoundStarted();
 
       state = 'HACKING';
       winnerData = null;
       hackQueue.length = 0;
       lastPlayerAttempts = {}; 
-      
-      document.getElementById('screen-hack').classList.remove('wrong-input');
 
-      currentCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+      document.getElementById('screen-hack').classList.remove('wrong-input');
       document.getElementById('hack-display').innerText = '****';
       document.getElementById('hack-author').innerText = 'ожидание...';
-      
+
+      // Генерация кода и массива всех возможных вариантов (0000 - 9999)
+      currentCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+      let possibleCodes = Array.from({length: 10000}, (_, i) => String(i).padStart(4, '0'));
       const digits = currentCode.split('').map(Number);
+
+      // ГЕНЕРАЦИЯ ПУЛА ПОДСКАЗОК
+      const hintsPool = [];
+
       const sum = digits.reduce((a, b) => a + b, 0);
+      hintsPool.push({ html: `<div>> <span>Сумма всех цифр:</span> ${sum}</div>`, filter: c => c.split('').reduce((a, b) => a + Number(b), 0) === sum });
+
       const evens = digits.filter(n => n % 2 === 0).length;
-      const missingDigit = [0,1,2,3,4,5,6,7,8,9].find(n => !digits.includes(n));
-      
-      let hintsHTML = `<div>> <span>Сумма всех цифр:</span> ${sum}</div>`;
-      hintsHTML += `<div>> <span>Количество четных цифр:</span> ${evens}</div>`;
-      if (missingDigit !== undefined) hintsHTML += `<div>> <span>В коде точно нет цифры:</span> ${missingDigit}</div>`;
-      if (digits[0] > digits[3]) hintsHTML += `<div>> <span>Первая цифра больше последней</span></div>`;
-      else if (digits[0] < digits[3]) hintsHTML += `<div>> <span>Первая цифра меньше последней</span></div>`;
-      else hintsHTML += `<div>> <span>Первая и последняя цифры равны</span></div>`;
-      
-      document.getElementById('hack-hints').innerHTML = hintsHTML;
+      hintsPool.push({ html: `<div>> <span>Количество четных цифр:</span> ${evens}</div>`, filter: c => c.split('').filter(n => Number(n) % 2 === 0).length === evens });
+
+      if (digits[0] > digits[3]) hintsPool.push({ html: `<div>> <span>Первая цифра больше последней</span></div>`, filter: c => Number(c[0]) > Number(c[3]) });
+      else if (digits[0] < digits[3]) hintsPool.push({ html: `<div>> <span>Первая цифра меньше последней</span></div>`, filter: c => Number(c[0]) < Number(c[3]) });
+      else hintsPool.push({ html: `<div>> <span>Первая и последняя цифры равны</span></div>`, filter: c => c[0] === c[3] });
+
+      const sumFirstTwo = digits[0] + digits[1];
+      hintsPool.push({ html: `<div>> <span>Сумма первых двух цифр:</span> ${sumFirstTwo}</div>`, filter: c => Number(c[0]) + Number(c[1]) === sumFirstTwo });
+
+      const sumLastTwo = digits[2] + digits[3];
+      hintsPool.push({ html: `<div>> <span>Сумма последних двух цифр:</span> ${sumLastTwo}</div>`, filter: c => Number(c[2]) + Number(c[3]) === sumLastTwo });
+
+      const missing = [0,1,2,3,4,5,6,7,8,9].filter(n => !digits.includes(n)).sort(()=>Math.random()-0.5);
+      missing.slice(0, 3).forEach(m => {
+          hintsPool.push({ html: `<div>> <span>В коде точно нет цифры:</span> ${m}</div>`, filter: c => !c.includes(String(m)) });
+      });
+
+      const present = [...new Set(digits)].sort(()=>Math.random()-0.5);
+      present.slice(0, 2).forEach(p => {
+          hintsPool.push({ html: `<div>> <span>В коде точно есть цифра:</span> ${p}</div>`, filter: c => c.includes(String(p)) });
+      });
+
+      // Перемешиваем пул подсказок случайным образом
+      hintsPool.sort(() => Math.random() - 0.5);
+
+      // ОПРЕДЕЛЕНИЕ СЛОЖНОСТИ
+      const targetVariants = { 'EASY': 2, 'MEDIUM': 8, 'HARD': 20 }[config.difficulty] || 8;
+      let selectedHints = [];
+
+      // МАТЕМАТИЧЕСКИЙ РЕШАТЕЛЬ (Применяем подсказки, пока не достигнем нужной сложности)
+      for (let hint of hintsPool) {
+          const newPossibleCodes = possibleCodes.filter(hint.filter);
+          
+          const isUseful = newPossibleCodes.length < possibleCodes.length;
+          const needsFiller = selectedHints.length < 3 && newPossibleCodes.length > 0; // Для визуала минимум 3 подсказки
+
+          if (isUseful || needsFiller) {
+              possibleCodes = newPossibleCodes;
+              selectedHints.push(hint.html);
+
+              if (possibleCodes.length <= targetVariants && selectedHints.length >= 3) {
+                  break; // Останавливаемся, если достигли целевой сложности
+              }
+          }
+      }
+
+      document.getElementById('hack-hints').innerHTML = selectedHints.join('');
       switchScreen('screen-hack');
     }
 
     function triggerWin(author, avatarUrl) {
       state = 'WAITING_MSG';
       winnerData = { author, avatar: avatarUrl, message: null };
-      
       if (!players[author]) players[author] = { score: 0, avatar: avatarUrl };
       players[author].score += 50;
-
       document.getElementById('win-author').innerText = `@${author}`; 
       document.getElementById('win-avatar').src = avatarUrl;
       document.getElementById('win-code').innerText = currentCode;
       switchScreen('screen-winner');
-
       let timeLeft = 20;
-      document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
-      
+      document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ: ${timeLeft} СЕК.`;
       timerInt = setInterval(() => {
         timeLeft--;
-        document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ ОТ ИГРОКА: ${timeLeft} СЕК.`;
+        document.getElementById('win-timer').innerText = `ОЖИДАНИЕ СООБЩЕНИЯ: ${timeLeft} СЕК.`;
         if (timeLeft <= 0) {
           clearInterval(timerInt);
-          if (winnerData.message) showMessageScreen();
-          else showLeaderboard(); 
+          if (winnerData.message) showMessageScreen(); else showLeaderboard(); 
         }
       }, 1000);
     }
@@ -261,7 +257,6 @@
       document.getElementById('msg-avatar').src = winnerData.avatar;
       document.getElementById('msg-text').innerText = winnerData.message;
       switchScreen('screen-message');
-
       let timeLeft = 15;
       document.getElementById('msg-timer').innerText = `ТРАНСЛЯЦИЯ: ${timeLeft} СЕК.`;
       timerInt = setInterval(() => {
@@ -274,21 +269,13 @@
     function showLeaderboard() {
       state = 'LEADERBOARD';
       const sorted = Object.entries(players).sort((a, b) => b[1].score - a[1].score).slice(0, 10);
-      
       let lbHTML = '';
       sorted.forEach(([name, data], idx) => {
         const num = String(idx + 1).padStart(2, '0');
-        lbHTML += `
-          <div class="lb-row">
-            <span class="yellow">${num}</span>
-            <img src="${data.avatar}" alt="ava">
-            <span class="lb-name">@${name}</span>
-            <span class="lb-score">${data.score} PTS</span>
-          </div>`;
+        lbHTML += `<div class="lb-row"><span class="yellow">${num}</span><img src="${data.avatar}"><span class="lb-name">@${name}</span><span class="lb-score">${data.score} PTS</span></div>`;
       });
       document.getElementById('lb-container').innerHTML = lbHTML || '<div style="color: #fff; text-align: center; margin-top: 50px;">Пока нет победителей</div>';
       switchScreen('screen-lb');
-
       let timeLeft = 10;
       document.getElementById('lb-timer').innerText = `СЛЕДУЮЩИЙ РАУНД ЧЕРЕЗ: ${timeLeft} СЕК.`;
       timerInt = setInterval(() => {
@@ -300,20 +287,13 @@
 
     window.handleChat = (author, text, avatarUrl) => {
       const match = text.match(/\b\d{4}\b/);
-      
       if (state === 'HACKING' && match) {
         const code = match[0];
-        
         if (lastPlayerAttempts[author] === code) return; 
-        const userPendingAttempts = hackQueue.filter(item => item.author === author).length;
-        if (userPendingAttempts >= 2) return; 
+        if (hackQueue.filter(item => item.author === author).length >= 2) return; 
         lastPlayerAttempts[author] = code;
-
         hackQueue.push({ author, code });
-
-        if (code === currentCode) {
-          triggerWin(author, avatarUrl);
-        }
+        if (code === currentCode) triggerWin(author, avatarUrl);
       } 
       else if (state === 'WAITING_MSG' && author === winnerData.author) {
         winnerData.message = text;
@@ -322,25 +302,16 @@
       }
     };
 
-    // --- УПРАВЛЕНИЕ ЗАПУСКОМ И ОШИБКАМИ ---
     let isGameStarted = false;
-
     window.initGame = () => {
       document.getElementById('reconnect-banner').style.display = 'none';
-      
       if (!isGameStarted) {
         document.getElementById('matrix').style.opacity = 0.3; 
         startRound();
         isGameStarted = true;
       }
     };
-
-    window.showReconnect = () => {
-      if (isGameStarted) {
-        document.getElementById('reconnect-banner').style.display = 'block';
-      }
-    };
-
+    window.showReconnect = () => { if (isGameStarted) document.getElementById('reconnect-banner').style.display = 'block'; };
     document.getElementById('matrix').style.opacity = 0.8; 
   </script>
 </body>
