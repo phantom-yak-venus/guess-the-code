@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_FILE="/etc/guess-the-code.env"
+
+CONTAINER_NAME="guess-the-code"
+
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
+  CONTAINER_NAME="${CONTAINER_NAME:-guess-the-code}"
+fi
+
+echo "Stopping timer..."
+sudo systemctl stop guess-the-code.timer 2>/dev/null || true
+
+echo "Disabling timer autostart..."
+sudo systemctl disable guess-the-code.timer 2>/dev/null || true
+
+echo "Stopping systemd service..."
+sudo systemctl stop guess-the-code.service 2>/dev/null || true
+
+echo "Stopping Docker container if it is still running..."
+sudo docker stop -t 120 "$CONTAINER_NAME" 2>/dev/null || true
+
+echo "Removing Docker container if it exists..."
+sudo docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+
+echo "Resetting failed state..."
+sudo systemctl reset-failed guess-the-code.service 2>/dev/null || true
+
+echo
+echo "Current status:"
+systemctl status guess-the-code.timer --no-pager 2>/dev/null || true
+systemctl status guess-the-code.service --no-pager 2>/dev/null || true
+
+echo
+echo "Docker containers:"
+sudo docker ps --filter "name=${CONTAINER_NAME}"

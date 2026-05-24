@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Reloading systemd..."
+sudo systemctl daemon-reload
+
+echo "Enabling and starting guess-the-code.timer..."
+sudo systemctl enable --now guess-the-code.timer
+
+echo
+echo "Timer status:"
+systemctl status guess-the-code.timer --no-pager
+
+echo
+echo "Scheduled runs:"
+systemctl list-timers --all | grep guess-the-code || true
+
+echo
+echo "Useful logs command:"
+echo "  journalctl -u guess-the-code.service -f -a"
