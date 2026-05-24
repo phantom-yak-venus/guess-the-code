@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ENV_FILE="/etc/guess-the-code.env"
-
 CONTAINER_NAME="guess-the-code"
+STOP_TIMEOUT_SECONDS="15"
 
 if [ -f "$ENV_FILE" ]; then
   set -a
@@ -18,14 +18,17 @@ sudo systemctl stop guess-the-code.timer 2>/dev/null || true
 echo "Disabling timer autostart..."
 sudo systemctl disable guess-the-code.timer 2>/dev/null || true
 
-echo "Stopping systemd service..."
-sudo systemctl stop guess-the-code.service 2>/dev/null || true
+echo "Trying graceful Docker stop for ${STOP_TIMEOUT_SECONDS}s..."
+timeout $((STOP_TIMEOUT_SECONDS + 5)) sudo docker stop -t "$STOP_TIMEOUT_SECONDS" "$CONTAINER_NAME" 2>/dev/null || true
 
-echo "Stopping Docker container if it is still running..."
-sudo docker stop -t 120 "$CONTAINER_NAME" 2>/dev/null || true
-
-echo "Removing Docker container if it exists..."
+echo "Force removing Docker container if it still exists..."
 sudo docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+
+echo "Stopping systemd service with short timeout..."
+timeout 20 sudo systemctl stop guess-the-code.service 2>/dev/null || true
+
+echo "Killing service processes if systemd is still stopping..."
+sudo systemctl kill --kill-who=all --signal=SIGKILL guess-the-code.service 2>/dev/null || true
 
 echo "Resetting failed state..."
 sudo systemctl reset-failed guess-the-code.service 2>/dev/null || true

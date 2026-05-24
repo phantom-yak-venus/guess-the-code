@@ -15,7 +15,6 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-# Load env variables
 set -a
 source "$ENV_FILE"
 set +a
@@ -24,7 +23,7 @@ IMAGE_NAME="${IMAGE_NAME:-headless-timer}"
 CONTAINER_NAME="${CONTAINER_NAME:-guess-the-code}"
 RUN_EVERY_MINUTES="${RUN_EVERY_MINUTES:-5}"
 RUNTIME_SECONDS="${RUNTIME_SECONDS:-120}"
-STOP_TIMEOUT_SECONDS="${STOP_TIMEOUT_SECONDS:-120}"
+STOP_TIMEOUT_SECONDS="${STOP_TIMEOUT_SECONDS:-15}"
 DOCKER_NETWORK="${DOCKER_NETWORK:-host}"
 NODE_OPTIONS="${NODE_OPTIONS:---dns-result-order=ipv4first}"
 
@@ -86,7 +85,7 @@ ExecStop=/usr/bin/docker stop -t ${STOP_TIMEOUT_SECONDS} ${CONTAINER_NAME}
 RuntimeMaxSec=${RUNTIME_SECONDS}
 
 # Must be bigger than STOP_TIMEOUT_SECONDS.
-TimeoutStopSec=$((STOP_TIMEOUT_SECONDS + 30))
+TimeoutStopSec=$((STOP_TIMEOUT_SECONDS + 10))
 
 Restart=no
 KillMode=mixed
@@ -120,8 +119,8 @@ sudo systemctl daemon-reload
 echo "Done."
 echo
 echo "Next commands:"
-echo "  infra/start"
-echo "  infra/stop"
+echo "  ./infra/start"
+echo "  ./infra/stop"
 echo
 echo "Check generated units:"
 echo "  systemctl cat guess-the-code.service"
